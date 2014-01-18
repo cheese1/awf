@@ -98,7 +98,7 @@ static void awf_on_scale_value_changed (GtkRange *range, gpointer unused);
 int main (int argc, char **argv)
 {
 	gchar *directory;
-	GtkWidget *menubar, *toolbar;
+	GtkWidget *menubar, *toolbar1, *toolbar2;
 	GtkWidget *vbox_window, *vbox_widget;
 	GtkWidget *vbox_label_treeview, *vbox_other_button, *vbox_progressbar_scale;
 	GtkWidget *vbox_combo_entry_spin_check_radio_button;
@@ -140,11 +140,12 @@ int main (int argc, char **argv)
 	/* load themes available at system level */
 
 	list_system_theme = awf_load_theme ("/usr/share/themes");
-
+	list_system_theme = g_slist_sort (list_system_theme, (GCompareFunc) awf_compare_theme);
 	/* load themes available at user level */
 
 	directory = g_build_path ("/", g_getenv ("HOME"), ".themes", NULL);
 	list_user_theme = awf_load_theme (directory);
+	list_user_theme = g_slist_sort (list_user_theme, (GCompareFunc) awf_compare_theme);
 	g_free (directory);
 
 	/* exclude themes at system level also available at user level */
@@ -169,10 +170,13 @@ int main (int argc, char **argv)
 	menubar = awf_build_menu (window);
 	gtk_box_pack_start (GTK_BOX (vbox_window), menubar, FALSE, FALSE, 0);
 
-	toolbar = gtk_toolbar_new ();
-	gtk_box_pack_start (GTK_BOX (vbox_window), toolbar, FALSE, FALSE, 0);
+	toolbar1 = gtk_toolbar_new ();
+	toolbar2 = gtk_toolbar_new ();	
+	gtk_box_pack_start (GTK_BOX (vbox_window), toolbar1, FALSE, FALSE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox_window), toolbar2, FALSE, FALSE, 0);
 #if GTK_CHECK_VERSION(3,0,0)
-	gtk_style_context_add_class (gtk_widget_get_style_context (toolbar), "primary-toolbar");
+	gtk_style_context_add_class (gtk_widget_get_style_context (toolbar1), "primary-toolbar");
+	gtk_style_context_add_class (gtk_widget_get_style_context (toolbar2), "primary-toolbar");
 #endif
 
 #if GTK_CHECK_VERSION(3,2,0)
@@ -381,7 +385,7 @@ int main (int argc, char **argv)
 	gtk_container_add (GTK_CONTAINER (vbox_progressbar_scale), hbox_scale);
 
 	/* toolbar */
-	awf = GTK_WIDGET (gtk_tool_button_new (gtk_image_new_from_icon_name ("awf", gtk_toolbar_get_icon_size (GTK_TOOLBAR(toolbar))), NULL));
+	awf = GTK_WIDGET (gtk_tool_button_new (gtk_image_new_from_icon_name ("awf", gtk_toolbar_get_icon_size (GTK_TOOLBAR(toolbar1))), NULL));
 	refresh = GTK_WIDGET (gtk_tool_button_new_from_stock (GTK_STOCK_REFRESH));
 	icon1 = GTK_WIDGET (gtk_tool_button_new_from_stock (GTK_STOCK_GOTO_FIRST));
 	icon2 = GTK_WIDGET (gtk_tool_button_new_from_stock (GTK_STOCK_GOTO_LAST));
@@ -398,13 +402,13 @@ int main (int argc, char **argv)
 	g_signal_connect (G_OBJECT(refresh), "clicked", G_CALLBACK (awf_refresh_theme), NULL);
 	g_signal_connect (G_OBJECT(awf), "clicked", G_CALLBACK (awf_run_me), NULL);
 
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM (awf), -1);
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM (refresh), -1);
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), gtk_separator_tool_item_new (), -1);
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM (icon1), -1);
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM (icon2), -1);
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), gtk_separator_tool_item_new (), -1);
-	gtk_toolbar_insert (GTK_TOOLBAR(toolbar), GTK_TOOL_ITEM (icon3), -1);
+	gtk_toolbar_insert (GTK_TOOLBAR(toolbar1), GTK_TOOL_ITEM (awf), -1);
+	gtk_toolbar_insert (GTK_TOOLBAR(toolbar1), GTK_TOOL_ITEM (refresh), -1);
+
+	gtk_toolbar_insert (GTK_TOOLBAR(toolbar2), GTK_TOOL_ITEM (icon1), -1);
+	gtk_toolbar_insert (GTK_TOOLBAR(toolbar2), GTK_TOOL_ITEM (icon2), -1);
+	gtk_toolbar_insert (GTK_TOOLBAR(toolbar2), gtk_separator_tool_item_new (), -1);
+	gtk_toolbar_insert (GTK_TOOLBAR(toolbar2), GTK_TOOL_ITEM (icon3), -1);
 
 	/* combo boxes and entries */
 
@@ -571,11 +575,17 @@ int main (int argc, char **argv)
 
 	gtk_progress_bar_set_inverted (GTK_PROGRESS_BAR (progressbar2), TRUE);
 	gtk_progress_bar_set_inverted (GTK_PROGRESS_BAR (progressbar4), TRUE);
+	
+	gtk_progress_bar_set_show_text (GTK_PROGRESS_BAR (progressbar1), TRUE);
+	gtk_progress_bar_set_show_text (GTK_PROGRESS_BAR (progressbar3), TRUE);
 #else
 	gtk_progress_bar_set_orientation (GTK_PROGRESS_BAR (progressbar1), GTK_PROGRESS_LEFT_TO_RIGHT);
 	gtk_progress_bar_set_orientation (GTK_PROGRESS_BAR (progressbar2), GTK_PROGRESS_RIGHT_TO_LEFT);
 	gtk_progress_bar_set_orientation (GTK_PROGRESS_BAR (progressbar3), GTK_PROGRESS_BOTTOM_TO_TOP);
 	gtk_progress_bar_set_orientation (GTK_PROGRESS_BAR (progressbar4), GTK_PROGRESS_TOP_TO_BOTTOM);
+
+	gtk_progress_bar_set_text (GTK_PROGRESS_BAR (progressbar1), "50 %");
+	gtk_progress_bar_set_text (GTK_PROGRESS_BAR (progressbar3), "50 %");
 #endif
 
 	gtk_box_pack_start (GTK_BOX (vbox_progressbar), progressbar1, FALSE, FALSE, 0);
@@ -644,8 +654,36 @@ int main (int argc, char **argv)
 	gtk_list_store_set (store, &iter, COLUMN1, "Cell1.1", COLUMN2, "Cell1.2", -1);
 	gtk_list_store_append (store, &iter);
 	gtk_list_store_set (store, &iter, COLUMN1, "Cell2.1", COLUMN2, "Cell2.2", -1);
+
+	model = GTK_TREE_MODEL (store);
+  	gtk_tree_view_set_model (GTK_TREE_VIEW (view), model);
+
+	scrolled_window = gtk_scrolled_window_new (NULL, NULL);
+	gtk_widget_set_size_request (scrolled_window, 200, -1);
+	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window), GTK_POLICY_ALWAYS, GTK_POLICY_ALWAYS);
+	gtk_container_add (GTK_CONTAINER (scrolled_window), view);
+
+	gtk_box_pack_start (GTK_BOX (vbox_label_treeview), scrolled_window, TRUE, TRUE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox_label_treeview), EMPTY, FALSE, FALSE, 0);
+
+	view = gtk_tree_view_new ();
+
+	renderer = gtk_cell_renderer_text_new ();
+	gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (view), -1, "longer Column1", renderer, "text", COLUMN1, NULL);
+
+	renderer = gtk_cell_renderer_text_new ();
+	gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (view), -1, "longer Column2", renderer, "text", COLUMN2, NULL);
+
+	store = gtk_list_store_new (NUM_COLS, G_TYPE_STRING, G_TYPE_STRING);
+
 	gtk_list_store_append (store, &iter);
-	gtk_list_store_set (store, &iter, COLUMN1, "Cell3.1", COLUMN2, "Cell3.2", -1);
+	gtk_list_store_set (store, &iter, COLUMN1, "longer Cell1.1", COLUMN2, "longer Cell1.2", -1);
+	gtk_list_store_append (store, &iter);
+	gtk_list_store_set (store, &iter, COLUMN1, "longer Cell2.1", COLUMN2, "longer Cell2.2", -1);
+	gtk_list_store_append (store, &iter);
+	gtk_list_store_set (store, &iter, COLUMN1, "longer Cell3.1", COLUMN2, "longer Cell3.2", -1);
+	gtk_list_store_append (store, &iter);
+	gtk_list_store_set (store, &iter, COLUMN1, "longer Cell4.1", COLUMN2, "longer Cell4.2", -1);
 
 	model = GTK_TREE_MODEL (store);
   	gtk_tree_view_set_model (GTK_TREE_VIEW (view), model);
@@ -1074,6 +1112,17 @@ awf_on_scale_value_changed (GtkRange *range, gpointer unused)
 	if (scale2 != (GtkWidget*)range) gtk_range_set_value (GTK_RANGE (scale2), value);
 	if (scale3 != (GtkWidget*)range) gtk_range_set_value (GTK_RANGE (scale3), value);
 	if (scale4 != (GtkWidget*)range) gtk_range_set_value (GTK_RANGE (scale4), value);
+
+#if GTK_CHECK_VERSION(3,0,0)
+#else
+	gchar *progress_text;
+
+	progress_text = g_strdup_printf ("%i %%", (int)value); 
+
+	gtk_progress_bar_set_text (GTK_PROGRESS_BAR (progressbar1), progress_text);
+	gtk_progress_bar_set_text (GTK_PROGRESS_BAR (progressbar3), progress_text);
+	g_free(progress_text);
+#endif
 
 	gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (progressbar1), value / 100.0);
 	gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (progressbar2), value / 100.0);
